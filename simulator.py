@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 
+import tensorflow.keras as keras
+
 gi = np.array([[0,-1,0],[0,0,0],[0,+1,0]])/2
 gj = np.array([[0,0,0],[-1,0,1],[0,0,0]])/2
 grad_kernel = np.stack([gi,gj], -1)
