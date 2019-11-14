@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 
 print("GPUs found :", tf.config.experimental.list_physical_devices("GPU"))
 
-
 gi = np.array([[0,-1,0],[0,0,0],[0,+1,0]])/2
 gj = np.array([[0,0,0],[-1,0,1],[0,0,0]])/2
 grad_kernel = np.stack([gi,gj], -1)
@@ -45,42 +44,58 @@ def take(a,indices_i, indices_j) :
     full_idices = n*indices_i + indices_j
     reshaped = a.reshape(m*n,2)
     res = np.take(reshaped,full_idices, axis=0)
-    return res.reshape(m,n,2)
+    return res.reshape(m,n,2)      
 
-#@tf.function
-def solve_step_diff(u, dt, dx, nu, v, lr) :
-    with tf.GradientTape() as tape :
-        left = v - dt*nu*lap_vec(v)
-        diff = left-u
-        diff2 = diff*diff
-        left_border = tf.math.reduce_sum(tf.math.square(v[:,0,1]))
-        right_border = tf.math.reduce_sum(tf.math.square(v[:,-1,1]))
-        top_border = tf.math.reduce_sum(tf.math.square(v[0,:,0]))
-        bottom_border = tf.math.reduce_sum(tf.math.square(v[-1,:,0]))
-        loss = tf.math.reduce_sum(diff2) +10*(left_border + right_border + top_border + bottom_border)
-    grad_l = tape.gradient(loss,[v])[0]
-    return v - lr * grad_l,loss
+def conjgrad_lap_step(r,x,p,rsold) :
+    Ap = lap(p)
+    alpha = rsold / tf.reduce_sum(p*Ap)
+    x.assign(x + alpha * p)
+    r.assign(r - alpha * Ap)
+    rsnew = tf.reduce_sum(r*r)
+    p.assign(r + (rsnew / rsold) * p)
+    rsold.assign(rsnew)   
 
-def solve_step_poisson_init(u, target):
-    with tf.GradientTape() as tape :
-        res = lap(u)
-        diff = res-target
-        diff2 = diff*diff
-        loss = tf.math.reduce_sum(diff2)
-    grad_l = tape.gradient(loss,[u])[0]
-    return -0.01*grad_l, grad_l,loss
+def conjgrad_lap(b,x, error_max) :
+    r = tf.Variable(b-lap(x))
+    p = tf.Variable(r)
+    rsold = tf.Variable(tf.reduce_sum(r*r))
+    for i in range(1000) :
+        rsnew = conjgrad_lap_step(r,x,p,rsold)
+        if  tf.sqrt(rsold) < error_max :
+            #print(i)
+            break
+        
+def conjgrad_diff_step(r,x,p,rsold,nu,dt) :
+    Ap = p - dt*nu*lap_vec(p)
+    tmp = tf.reduce_sum(p*Ap)
+    alpha = rsold / tmp
+    x.assign(x + alpha * p)
+    r.assign(r - alpha * Ap)
+    rsnew = tf.reduce_sum(r*r)
+    p.assign(r + (rsnew / rsold) * p)
+    rsold.assign(rsnew)
 
-#@tf.function
-def solve_step_poisson(u, target,last_grad, s):
-    with tf.GradientTape() as tape :
-        res = lap(u)
-        diff = res-target
-        diff2 = diff*diff
-        loss = tf.math.reduce_sum(diff2)
-    grad_l = tape.gradient(loss,[u])[0]
-    diff_grad = grad_l-last_grad
-    alpha = tf.reduce_sum(diff_grad*s) / tf.reduce_sum(diff_grad*diff_grad)
-    return -alpha*grad_l, grad_l,loss
+def conjgrad_diff(w2, nu, dt, error_max) :
+    x = tf.Variable(w2)
+    r = tf.Variable(w2 - x + dt*nu*lap_vec(x))
+    p = tf.Variable(r)
+    rsold = tf.Variable(tf.reduce_sum(r*r))
+    for i in range(1000) :
+        conjgrad_diff_step(r,x,p,rsold,nu,dt)
+        if  tf.sqrt(rsold) < error_max :
+            #print(i, rsold.numpy())
+            break
+        rsold
+    return x
+
+def conjgrad_diff_sp(w2, nu, dt, error_max) :
+    def lin_func(a) :
+        a = np.reshape(a, w2.shape)
+        return np.reshape(a - dt*nu*lap_vec(a), (-1,))
+    x = np.zeros(w2.shape)
+    x = np.reshape(x, (-1,))
+    op = LinearOperator((len(x),len(x)),matvec=lin_func)
+    return np.reshape(cg(op, np.reshape(w2,(-1,)),x)[0],w2.shape)
 
 class Simulator :
     def __init__(self, m, n, dx, nu, border_condition, force):
@@ -92,10 +107,10 @@ class Simulator :
         self.force = force
         self.w = w = np.zeros((m,n,2))
         self.dust = [[np.random.random()*(m-1), np.random.random()*(n-1)] for k in range(400)] 
-        self.u = tf.Variable(np.random.normal(size=(self.w.shape[:2])))
+        self.u = tf.Variable(np.zeros((self.w.shape[:2])))
         self.indices = tf.constant(np.indices((m,n)).swapaxes(0,2).swapaxes(0,1), dtype=tf.float32)
         self.clipping = tf.constant(np.stack([np.ones((m,n), dtype=np.int32)*m,np.ones((m,n), dtype=np.int32)*n], axis=-1))
-
+        
     def display(self, c='b'):
         plt.scatter([d[1] for d in self.dust], [d[0] for d in self.dust], c=c, s=5)
         
@@ -146,31 +161,23 @@ class Simulator :
     
     def compute_w3(self, w2, dt):
         #solving (I - dt * nu * lap ) v = w2
-        v = tf.Variable(w2.copy())
-        for k in range(100) :      
-            next_v, loss = solve_step_diff(w2, dt, self.dx, self.nu, v,0.08)
-            v.assign(next_v)
-            if loss/(self.m*self.n) < 0.00001 :
-                #print(k)
-                break
-        #print("loss diff",loss.numpy()/(self.m*self.n))
+        #v = conjgrad_diff_sp(w2, self.nu, dt, 1e-5*self.m*self.n)
+        v = conjgrad_diff(w2, self.nu, dt, 1e-6*self.m*self.n)
+        diff = v-dt*self.nu*lap_vec(w2)-w2
+        loss = tf.reduce_sum(diff*diff)
+        #print("diff :", loss.numpy()/(self.m*self.n))
         return v.numpy()
+        #return v
 
 
     def compute_w4(self, w3, dt):
         target = div(w3)
-        self.u.assign(np.random.normal(size=(w3.shape[:2])))
-        s, last_grad, loss = solve_step_poisson_init(self.u, target)
-        self.u.assign(self.u+s)
-        for k in range(100) :      
-            s, last_grad, loss = solve_step_poisson(self.u, target,last_grad,s)
-            self.u.assign(self.u+s)
-            #print(loss.numpy())
-            if loss/(self.m*self.n) < 0.001 : 
-                #print(k)
-                break
-        #print("poisson :",k, loss.numpy()/(self.m*self.n))
-        
+        #self.u.assign(np.zeros((w3.shape[:2])))
+        #self.u.assign(self.u+s)
+        conjgrad_lap(target, self.u, 1e-5*self.m*self.n)
+        diff = lap(self.u)-target
+        loss = tf.reduce_sum(diff*diff)
+        #print("poisson :", loss.numpy()/(self.m*self.n))
         grad_u = grad(self.u).numpy()
         return  w3 - grad_u
     
@@ -184,22 +191,26 @@ class Simulator :
             d[1] += dt*self.w[i,j,1]
     
     def time_step(self, dt, debug=False) :
+        #start = time.time()
         w0 = self.w.copy() 
-        self.border_condition(w0)
         w1 = self.compute_w1(w0, dt)
+        #w1_time = time.time()
 
         self.border_condition(w1)
         w2 = self.compute_w2(w1, dt)
-        self.border_condition(w2)
+        #w2_time = time.time()
 
         cached_u = self.u.numpy().copy()
         w3 = self.compute_w3(w2, dt)
-        self.border_condition(w3)
+        #w3_time = time.time()
 
         w4 = self.compute_w4(w3, dt)
-        self.border_condition(w4)
+        #w4_time = time.time()
+
         self.w = w4
         self.update_dust(dt)
+        
+        #print(w1_time-start, w2_time-w1_time, w3_time-w2_time, w4_time-w3_time) 
         return w3, cached_u
     
 def display_w(w) :
