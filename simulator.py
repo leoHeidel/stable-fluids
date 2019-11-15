@@ -28,7 +28,7 @@ lap_vec_kernel = tf.constant(lap_vec_kernel)
 def grad(u) :
     expended = tf.expand_dims(tf.expand_dims(u, 0), -1)
     return tf.nn.convolution(expended, grad_kernel, padding="SAME", strides=1)[0]
-def lap(u) :
+def lap_old(u) :
     expended = tf.expand_dims(tf.expand_dims(u, 0), -1)
     return tf.nn.convolution(expended, lap_kernel, padding="SAME", strides=1)[0,:,:,0]
 def lap_vec(u) :
@@ -37,7 +37,8 @@ def lap_vec(u) :
 def div(u) :
     expended = tf.expand_dims(u, 0)
     return tf.nn.convolution(expended, div_kernel, padding="SAME", strides=1)[0,:,:,0]
-
+def lap(u) :
+    return div(grad(u))
 
 def take(a,indices_i, indices_j) :
     m,n = a.shape[:2]
@@ -203,6 +204,7 @@ class Simulator :
         cached_u = self.u.numpy().copy()
         w3 = self.compute_w3(w2, dt)
         #w3_time = time.time()
+        self.border_condition(w1)
 
         w4 = self.compute_w4(w3, dt)
         #w4_time = time.time()
