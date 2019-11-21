@@ -28,6 +28,22 @@ class Renderer :
         screen_dist : the distance from camera_position of the screen where the rendering is projected.
         """
         order = 1
+        input_tensor = tf.pad(input_tensor, [[1,1],[1,1],[1,1]]).numpy()
+        input_tensor[1,1:-2,1] = 1
+        input_tensor[-2,1:-2,1] = 1
+        input_tensor[1,1:-2,-2] = 1
+        input_tensor[-2,1:-2,-2] = 1
+
+        input_tensor[1:-2,1,1] = 1
+        input_tensor[1:-2,-2,1] = 1
+        input_tensor[1:-2,1,-2] = 1
+        input_tensor[1:-2,-2,-2] = 1
+
+        input_tensor[1,1,1:-2] = 1
+        input_tensor[-2,1,1:-2] = 1
+        input_tensor[1,-2,1:-2] = 1
+        input_tensor[-2,-2,1:-2] = 1
+        
         if abs(camera_position[2]) > abs(camera_position[0]) :
             camera_position = camera_position[::-1]
             input_tensor = np.swapaxes(input_tensor, 0, 2)
