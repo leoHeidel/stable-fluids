@@ -72,7 +72,7 @@ class Renderer :
         max_clip = np.stack([np.ones((self.display_m,self.display_n))*(m-1),np.ones((self.display_m,self.display_n))*(n-1)], axis=-1)
         for x in batch_fact:
             cam_pos_reshaped = np.reshape(camera_position[1:],(1,1,2))
-            intersect_indices = cam_pos_reshaped + (pixel_pos[:,:,1:] - cam_pos_reshaped)*np.reshape(x,(self.display_m,self.display_n,1))
+            intersect_indices = cam_pos_reshaped + (pixel_pos[:,:,1:] - cam_pos_reshaped)*np.reshape(x,(self.display_m,self.display_n,1)) + 0.5
             batch_indices.append(tf.clip_by_value(intersect_indices, 0, max_clip).numpy().astype(np.int))
 
         batch_indices = np.array(batch_indices)
