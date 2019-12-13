@@ -1,8 +1,8 @@
 # stable-fluids
 
-This is a school project for the class INF574 at Polytechnique Paris. The goal of this project is to have an implementation of the artivle *Stable Fluids* by **Jos Stam** (1999).
+This is a school project for the class INF574 at Polytechnique Paris. The goal of this project is to have an implementation of the article *Stable Fluids* by **Jos Stam** (1999).
 
-For this project we use Python 3 and Tensorflow 2.0. This may not be the most logical choice, but is a good exercise. A better choice would be to use openGL. 
+For this project we use Python 3 and Tensorflow 2.0. This may not be the most logical choice, but it is a good exercise. A better choice would be to use openGL. 
 
 ## Dependencies
 
@@ -17,3 +17,5 @@ For this project we use Python 3 and Tensorflow 2.0. This may not be the most lo
 
 - 3d-renderer-demo.ipynb : Demo of the renderer
 - demo-stable-fluid.ipynb : Demo of the project
+- simulator-demo-colorblend.ipynb : Demo of the color blending example
+- simulator-demo-image-deform.ipynb : Demo of the texture deformation example
