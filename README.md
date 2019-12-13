@@ -8,3 +8,12 @@ For this project we use python 3 and Tensorflow 2.0. This may not be the most lo
 
 - tensorflow 2
 - matlplotlib
+
+## Strutcure
+
+- simulatorMultiDim.py : where all the high level mathematical opperations are made.
+- geometry.py : where the operations which are specific to the geometry and the number of dimensions are made, such as gradient, laplacian ...
+- renderer.py : for rendering by ray tracing in 3D
+
+- 3d-renderer-demo.ipynb : Demo of the renderer
+- demo-stable-fluid.ipynb : Demo of the project
