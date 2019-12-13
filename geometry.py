@@ -2,7 +2,15 @@ import tensorflow as tf
 import numpy as np
 
 class geo2d_33conv :
+    """
+    Represents the different geometrical operation needed in 2 dimensions.
+    This class is fully implemented in tensorflow 2.0 ans is gpu compatible
+    Most operations are computed using 2d convolution. As most of the kernel are sparse, we should expect a huge gain in performace if the operations were better inplemented.  
+    """
     def __init__(self, m,n) :
+        """
+        m,n the dimensions of the 2d space.
+        """
         self.m = m
         self.n = n
         
@@ -40,11 +48,20 @@ class geo2d_33conv :
         return tf.nn.convolution(expended, self.div_kernel, padding="SAME", strides=1)[0,:,:,0]    
     
     def lap(self, u) :
+        """
+        The scalar laplacian, implemented as the composition of our grad and div.
+        Doing so allows to completly nullify the loss in the poisson equation.
+        
+        The other alternativ being to implement the lapacian as convolution with the corresponding 3*3 kernel.
+        """
         expended = tf.expand_dims(tf.expand_dims(u, 0), -1)
         res_grad = tf.nn.convolution(expended, self.grad_kernel, padding="SAME", strides=1)
         return tf.nn.convolution(res_grad, self.div_kernel, padding="SAME", strides=1)[0,:,:,0]    
     
     def apply_speed(self, dt, speed, array) :
+        """
+        Function mostly used for the advection. "move" a vectorial field with respect to a speed field. 
+        """
         #Position of point i,j at t-dt, shape : m,n,2 
         m,n = self.m,self.n
         indices = self.indices - dt*speed
@@ -64,7 +81,15 @@ class geo2d_33conv :
         return res
 
 class geo3d_13conv :
+    """
+    Represents the different geometrical operation needed in 3 dimensions.
+    This class is fully implemented in tensorflow 2.0 ans is gpu compatible
+    Most operations are computed using 3d convolution, with a 1*3 kernel, This make the kernel not to sparce and imprive the performance compared to a 3*3*3 sparce kernel.
+    """
     def __init__(self, m,n,p) :
+        """
+        m,n,p the dimensions of the 3d space.
+        """
         self.m, self.n, self.p = m,n,p
         grad_kernel_base = np.array([-1,0,1])/2
         grad_kernel_x = np.expand_dims(np.expand_dims(grad_kernel_base,-1),-1)
@@ -121,10 +146,19 @@ class geo3d_13conv :
         return result
 
     def lap(self, u) :
+        """
+        The scalar laplacian, implemented as the composition of our grad and div.
+        Doing so allows to completly nullify the loss in the poisson equation.
+        
+        The other alternativ being to implement the lapacian as convolution with the corresponding 3*3 kernel.
+        """
         return self.div(self.grad(u)) 
 
     
     def apply_speed(self, dt, speed, array) :
+        """
+        Function mostly used for the advection. "move" a vectorial field with respect to a speed field. 
+        """
         m,n,p = self.m, self.n, self.p
         #Position of point i,j,k at t-dt, shape : m,n,p,3 
         w1 = tf.constant(speed, dtype=tf.float32)

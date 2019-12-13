@@ -32,7 +32,7 @@ class Simulator :
         
         #helper tensors for w3 to w4
         self.u = tf.Variable(np.zeros(shape), dtype=tf.float32)        
-        self.error_max_lap = tf.constant(1e-4*np.prod(shape), dtype=tf.float32)
+        self.error_max_lap = tf.constant(1e-5*np.prod(shape), dtype=tf.float32)
         self.r = tf.Variable(np.zeros(shape), dtype=tf.float32)
         self.p = tf.Variable(self.r, dtype=tf.float32)
         self.rsold = tf.Variable(0, dtype=tf.float32)
@@ -128,6 +128,13 @@ class Simulator :
         return  w3 - grad_u
 
     def time_step(self, dt, debug=False) :
+        """
+        Executed every time step to update the speed
+        w  -> w1 : apply forces
+        w1 -> w2 : apply advection
+        w2 -> w3 : apply diffusion
+        w3 -> w4 : enforce matter conservation
+        """
         w1 = self._compute_w1(self.w, dt)
         w2 = self._compute_w2(w1, dt)
         w3 = self._compute_w3(w2, dt)*self.border_condition
